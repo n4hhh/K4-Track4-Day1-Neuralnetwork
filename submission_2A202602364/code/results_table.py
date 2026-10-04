@@ -175,8 +175,9 @@ def write_xlsx(
     rows: list[dict],
     template_path: str,
     out_path: str,
+    summary_notes: dict[str, str] | None = None,
 ) -> None:
-    """Dien cac dong vao sheet Experiments."""
+    """Dien bang Experiments, Seeds va ghi chu ngan trong Summary."""
     workbook = openpyxl.load_workbook(
         template_path,
         data_only=False,
@@ -208,6 +209,12 @@ def write_xlsx(
         if isinstance(value, str) and value.startswith("="):
             formula_templates[column] = value
 
+    last_data_row = max(sheet.max_row, len(rows) + 1)
+
+    for row_index in range(2, last_data_row + 1):
+        for column in range(1, sheet.max_column + 1):
+            sheet.cell(row=row_index, column=column).value = None
+
     for row_index, row in enumerate(
         rows,
         start=2,
@@ -225,21 +232,55 @@ def write_xlsx(
                     value=_json_safe(value),
                 )
 
-        if row_index > 2:
-            for column, formula in formula_templates.items():
-                source = sheet.cell(
-                    row=2,
-                    column=column,
-                )
-                destination = sheet.cell(
-                    row=row_index,
-                    column=column,
+        for column, formula in formula_templates.items():
+            source_coordinate = sheet.cell(row=2, column=column).coordinate
+            destination = sheet.cell(row=row_index, column=column)
+            destination.value = Translator(
+                formula,
+                origin=source_coordinate,
+            ).translate_formula(destination.coordinate)
+
+    if "Seeds" in workbook.sheetnames:
+        seeds_sheet = workbook["Seeds"]
+        baseline_rows = [row for row in rows if row.get("group") == "baseline"]
+        baseline_rows.sort(key=lambda row: row.get("seed", 0))
+
+        for row_index in range(2, 7):
+            seeds_sheet.cell(row=row_index, column=1).value = None
+
+        for row_index, row in enumerate(baseline_rows[:5], start=2):
+            seeds_sheet.cell(row=row_index, column=1).value = row["exp_id"]
+
+    if "Summary" in workbook.sheetnames:
+        summary_sheet = workbook["Summary"]
+        summary_notes = dict(summary_notes or {})
+        groups = {row.get("group") for row in rows}
+
+        for group in groups:
+            if not group or group in summary_notes:
+                continue
+
+            candidates = [
+                row
+                for row in rows
+                if row.get("group") == group
+                and row.get("val_macro_f1") is not None
+            ]
+
+            if candidates:
+                best = max(candidates, key=lambda row: row["val_macro_f1"])
+                summary_notes[group] = (
+                    f"Best {best['exp_id']}: "
+                    f"val macro-F1={best['val_macro_f1']:.4f}."
                 )
 
-                destination.value = Translator(
-                    formula,
-                    origin=source.coordinate,
-                ).translate_formula(destination.coordinate)
+        for row_index in range(2, summary_sheet.max_row + 1):
+            group = summary_sheet.cell(row=row_index, column=1).value
+
+            if group in summary_notes:
+                summary_sheet.cell(row=row_index, column=8).value = (
+                    summary_notes[group]
+                )
 
     output_path = Path(out_path)
     output_path.parent.mkdir(

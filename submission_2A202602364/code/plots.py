@@ -15,9 +15,6 @@ def plot_run(result: dict, path: str) -> None:
 
     epochs = history["epoch"]
 
-    if not epochs:
-        raise ValueError("Thi nghiem chua co epoch hoan thanh")
-
     output_path = Path(path)
     output_path.parent.mkdir(
         parents=True,
@@ -29,6 +26,25 @@ def plot_run(result: dict, path: str) -> None:
         3,
         figsize=(16, 4.5),
     )
+
+    if not epochs:
+        for axis in axes:
+            axis.text(
+                0.5,
+                0.5,
+                "Diverged before first completed epoch",
+                ha="center",
+                va="center",
+                transform=axis.transAxes,
+            )
+            axis.set_axis_off()
+
+        figure.suptitle(f"{cfg['exp_id']} | no completed epoch")
+        figure.tight_layout()
+        figure.savefig(output_path, dpi=160, bbox_inches="tight")
+        plt.close(figure)
+        print("Saved divergence figure:", output_path)
+        return
 
     axes[0].plot(
         epochs,
