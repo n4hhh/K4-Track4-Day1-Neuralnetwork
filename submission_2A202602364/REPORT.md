@@ -22,6 +22,8 @@
 
 Step-0 loss cao hơn `ln(7)` khoảng `0,4317`. Đây không phải lỗi shape hay softmax: He initialization tạo logits có độ phân tán ban đầu đáng kể, với activation std sau các Linear là `[0,6962; 0,6614; 0,6522]`. Phép thử 20 mẫu xác nhận model và vòng cập nhật phối hợp đúng.
 
+![Kiểm tra overfit 20 mẫu](figures/part1_overfit20.png)
+
 Baseline được chạy với ba seed:
 
 | exp_id | Best epoch | Val accuracy | Val macro-F1 | Val loss |
@@ -32,11 +34,15 @@ Baseline được chạy với ba seed:
 
 Validation accuracy trung bình là `0,9066 +/- 0,0017`; validation macro-F1 là `0,8484 +/- 0,0087`. Tôi dùng `2 sigma = 0,0175` làm ngưỡng tham khảo. Chênh lệch nhỏ hơn ngưỡng này không được xem là bằng chứng chắc chắn rằng một cấu hình tốt hơn.
 
+![Nhiễu giữa ba seed baseline](figures/compare_baseline_seeds_f1.png)
+
 ## 3. Kết quả thí nghiệm
 
 ### 3.1 Hàm mất mát
 
-Tôi dự đoán CE phù hợp hơn MSE cho phân loại đa lớp. `loss-mse` đạt validation accuracy `0,8686` và macro-F1 `0,7326`, thấp hơn `base-s42` lần lượt `0,0373` và `0,1238`. Không thể so trực tiếp MSE loss `0,0296` với CE loss `0,2380` vì hai loss khác thang đo. CE tối ưu xác suất lớp đúng trực tiếp và tạo gradient hữu ích hơn khi model dự đoán sai; MSE trên logits one-hot học chậm, nhất là với lớp hiếm. Xem `figures/compare_loss_f1.png`.
+Tôi dự đoán CE phù hợp hơn MSE cho phân loại đa lớp. `loss-mse` đạt validation accuracy `0,8686` và macro-F1 `0,7326`, thấp hơn `base-s42` lần lượt `0,0373` và `0,1238`. Không thể so trực tiếp MSE loss `0,0296` với CE loss `0,2380` vì hai loss khác thang đo. CE tối ưu xác suất lớp đúng trực tiếp và tạo gradient hữu ích hơn khi model dự đoán sai; MSE trên logits one-hot học chậm, nhất là với lớp hiếm.
+
+![So sánh hàm mất mát](figures/compare_loss_f1.png)
 
 ### 3.2 Bộ tối ưu
 
@@ -47,27 +53,39 @@ Mỗi optimizer được thử với ít nhất hai learning rate. SGD momentum 
 | SGD momentum | `base-s42` | 0,1 | 0,8564 |
 | Adam | `opt-adam-lr1e-3` | 0,001 | 0,8495 |
 
-Adam tốt nhất thấp hơn SGD momentum `0,0069`, nhỏ hơn `2 sigma`, nên chưa thể kết luận optimizer nào tổng quát hóa tốt hơn. Learning rate có ảnh hưởng lớn: SGD `0,03` chỉ đạt `0,8166`; Adam `0,0003` chỉ đạt `0,7958`. Kết luận về optimizer sẽ sai nếu mỗi optimizer không được chỉnh learning rate riêng. Xem `figures/compare_optimizer_f1.png`.
+Adam tốt nhất thấp hơn SGD momentum `0,0069`, nhỏ hơn `2 sigma`, nên chưa thể kết luận optimizer nào tổng quát hóa tốt hơn. Learning rate có ảnh hưởng lớn: SGD `0,03` chỉ đạt `0,8166`; Adam `0,0003` chỉ đạt `0,7958`. Kết luận về optimizer sẽ sai nếu mỗi optimizer không được chỉnh learning rate riêng.
+
+![So sánh optimizer](figures/compare_optimizer_f1.png)
 
 ### 3.3 Hyper-parameter: kiến trúc
 
-`hparam-wide` dùng `54 -> 512 -> 256 -> 7`, 161.287 tham số và đạt validation macro-F1 `0,8721`. `hparam-deep` dùng `54 -> 256 -> 128 -> 64 -> 7`, 55.687 tham số và đạt `0,8704`. Hai mức tăng so với baseline là `0,0158` và `0,0140`, đều chưa vượt `2 sigma`. M-wide được chọn làm cấu hình cuối vì có macro-F1 lớn nhất tại checkpoint được chọn bằng validation loss, nhưng thí nghiệm kiến trúc mới chỉ có một seed nên kết luận còn hạn chế. Xem `figures/compare_hparam_f1.png`.
+`hparam-wide` dùng `54 -> 512 -> 256 -> 7`, 161.287 tham số và đạt validation macro-F1 `0,8721`. `hparam-deep` dùng `54 -> 256 -> 128 -> 64 -> 7`, 55.687 tham số và đạt `0,8704`. Hai mức tăng so với baseline là `0,0158` và `0,0140`, đều chưa vượt `2 sigma`. M-wide được chọn làm cấu hình cuối vì có macro-F1 lớn nhất tại checkpoint được chọn bằng validation loss, nhưng thí nghiệm kiến trúc mới chỉ có một seed nên kết luận còn hạn chế.
+
+![So sánh kiến trúc](figures/compare_hparam_f1.png)
 
 ### 3.4 Dropout
 
-Baseline có final validation-train loss gap `0,0208`, chưa biểu hiện quá khớp mạnh. Dropout `0,2` giảm gap xuống `0,0085` nhưng macro-F1 giảm còn `0,8147`; dropout `0,5` giảm gap xuống `0,0043` nhưng macro-F1 chỉ còn `0,6647`. Dropout làm train và validation gần nhau hơn bằng cách regularize model, nhưng trong trường hợp này nó gây thiếu khớp. Gap nhỏ không tự động đồng nghĩa với mô hình tốt. Xem `figures/compare_dropout_f1.png`.
+Baseline có final validation-train loss gap `0,0208`, chưa biểu hiện quá khớp mạnh. Dropout `0,2` giảm gap xuống `0,0085` nhưng macro-F1 giảm còn `0,8147`; dropout `0,5` giảm gap xuống `0,0043` nhưng macro-F1 chỉ còn `0,6647`. Dropout làm train và validation gần nhau hơn bằng cách regularize model, nhưng trong trường hợp này nó gây thiếu khớp. Gap nhỏ không tự động đồng nghĩa với mô hình tốt.
+
+![So sánh dropout](figures/compare_dropout_f1.png)
 
 ### 3.5 Gradient clipping
 
-Gradient norm baseline ổn định khoảng `0,51-0,58`, nên tôi chọn `c=0,6` và stress-test ở learning rate `0,3`. Không clip đạt macro-F1 `0,8508`; clip đạt `0,8589`; cả hai không phân kỳ. Chênh lệch `0,0081` nhỏ hơn nhiễu. Gradient norm trung bình theo epoch của hai run nằm khoảng `0,35-0,40`, nhưng log không lưu cực đại từng batch nên không thể khẳng định clipping chưa bao giờ kích hoạt. Kết quả chỉ cho thấy không có bùng nổ gradient rõ trong stress test này. Xem `figures/compare_clipping_f1.png`.
+Gradient norm baseline ổn định khoảng `0,51-0,58`, nên tôi chọn `c=0,6` và stress-test ở learning rate `0,3`. Không clip đạt macro-F1 `0,8508`; clip đạt `0,8589`; cả hai không phân kỳ. Chênh lệch `0,0081` nhỏ hơn nhiễu. Gradient norm trung bình theo epoch của hai run nằm khoảng `0,35-0,40`, nhưng log không lưu cực đại từng batch nên không thể khẳng định clipping chưa bao giờ kích hoạt. Kết quả chỉ cho thấy không có bùng nổ gradient rõ trong stress test này.
+
+![So sánh gradient clipping](figures/compare_clipping_f1.png)
 
 ### 3.6 Mixed precision
 
-FP16 không cho kết quả như dự đoán. `amp-fp16` mất `1,826 s/epoch`, chậm hơn FP32 `1,442 s/epoch`, bộ nhớ đo được cùng khoảng `190,9 MB`, và phân kỳ tại epoch 9. Checkpoint hợp lệ trước phân kỳ đạt macro-F1 `0,7791`. Mạng nhỏ làm chi phí autocast và GradScaler lấn át lợi ích Tensor Core; FP16 cũng có dải biểu diễn hẹp hơn. Xem `figures/compare_amp_f1.png`.
+FP16 không cho kết quả như dự đoán. `amp-fp16` mất `1,826 s/epoch`, chậm hơn FP32 `1,442 s/epoch`, bộ nhớ đo được cùng khoảng `190,9 MB`, và phân kỳ tại epoch 9. Checkpoint hợp lệ trước phân kỳ đạt macro-F1 `0,7791`. Mạng nhỏ làm chi phí autocast và GradScaler lấn át lợi ích Tensor Core; FP16 cũng có dải biểu diễn hẹp hơn.
+
+![So sánh FP32 và FP16](figures/compare_amp_f1.png)
 
 ### 3.7 Khởi tạo
 
-He đạt macro-F1 `0,8564`, Xavier đạt `0,8538`; chênh lệch `0,0026` nằm trong nhiễu. Activation std của He là `[0,6916; 0,6563; 0,6535]`, còn Xavier là `[0,2887; 0,2237; 0,2169]`. He giữ phương sai tốt hơn qua ReLU. Với zeros, activation std bằng 0 ở mọi lớp; model mắc tại accuracy lớp đa số `0,4876` và macro-F1 `0,0936`. Các nơ-ron khởi tạo giống nhau nhận cập nhật đối xứng và không học được đặc trưng khác nhau. Xem `figures/compare_init_f1.png`.
+He đạt macro-F1 `0,8564`, Xavier đạt `0,8538`; chênh lệch `0,0026` nằm trong nhiễu. Activation std của He là `[0,6916; 0,6563; 0,6535]`, còn Xavier là `[0,2887; 0,2237; 0,2169]`. He giữ phương sai tốt hơn qua ReLU. Với zeros, activation std bằng 0 ở mọi lớp; model mắc tại accuracy lớp đa số `0,4876` và macro-F1 `0,0936`. Các nơ-ron khởi tạo giống nhau nhận cập nhật đối xứng và không học được đặc trưng khác nhau.
+
+![So sánh khởi tạo trọng số](figures/compare_init_f1.png)
 
 ## 4. Đánh giá cuối trên eval
 
@@ -92,7 +110,9 @@ Final cải thiện eval macro-F1 `0,0138`. Mức tăng đã được đo nhưng
 | 5 | 3.473 | 0,8137 | 0,8390 | 0,8262 |
 | 6 | 4.102 | 0,9151 | 0,9300 | 0,9225 |
 
-Lớp 4 khó nhất với F1 `0,7874` và thường bị nhầm thành lớp 1. Lớp 4 chỉ có 1.899 mẫu eval, trong khi lớp 1 có 56.661 mẫu. Mất cân bằng và đặc trưng chồng lấn có thể làm biên quyết định thiên về lớp 1. Một hướng thử tiếp là class-weighted CE hoặc sampling cân bằng, nhưng tôi không chỉnh mô hình sau khi đã xem eval. Ma trận nhầm lẫn nằm ở `figures/final_confusion_matrix.png`.
+Lớp 4 khó nhất với F1 `0,7874` và thường bị nhầm thành lớp 1. Lớp 4 chỉ có 1.899 mẫu eval, trong khi lớp 1 có 56.661 mẫu. Mất cân bằng và đặc trưng chồng lấn có thể làm biên quyết định thiên về lớp 1. Một hướng thử tiếp là class-weighted CE hoặc sampling cân bằng, nhưng tôi không chỉnh mô hình sau khi đã xem eval.
+
+![Ma trận nhầm lẫn trên tập eval](figures/final_confusion_matrix.png)
 
 ## 5. Trả lời câu hỏi dẫn dắt
 
