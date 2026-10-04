@@ -80,7 +80,7 @@ def save_result(
 def load_results(
     results_dir: str = "../results",
 ) -> list[dict]:
-    """Doc cac JSON ket qua thi nghiem va bo qua file thong ke phu."""
+    """Doc JSON thi nghiem, bo qua cac JSON thong ke hoac metadata."""
     input_dir = Path(results_dir)
 
     if not input_dir.exists():
@@ -92,12 +92,19 @@ def load_results(
         with path.open("r", encoding="utf-8") as file:
             payload = json.load(file)
 
-        required_keys = {"cfg", "history", "summary"}
-
         if not isinstance(payload, dict):
             continue
 
-        if not required_keys.issubset(payload):
+        cfg = payload.get("cfg")
+        history = payload.get("history")
+        summary = payload.get("summary")
+
+        if not all(isinstance(item, dict) for item in (cfg, history, summary)):
+            continue
+
+        exp_id = cfg.get("exp_id")
+
+        if not isinstance(exp_id, str) or not exp_id:
             continue
 
         results.append(payload)
