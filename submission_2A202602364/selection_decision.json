@@ -1,0 +1,9 @@
+{
+  "criterion": "highest validation macro-F1 among completed experiments",
+  "selected_exp_id": "hparam-wide",
+  "selected_val_macro_f1": 0.8721427971578412,
+  "selected_best_val_loss": 0.2047066922793046,
+  "selected_best_epoch": 18,
+  "baseline_exp_id": "base-s42",
+  "baseline_val_macro_f1": 0.8563775866717789
+}
